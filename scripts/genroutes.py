@@ -94,7 +94,10 @@ class RouteRepr:
     req_handler: str
     resp_handler: str
 
-    condition: List[str] = field(default_factory=list)
+    conditions: set[str] = field(default_factory=set)
+
+    def unconditional(self) -> bool:
+        return len(self.conditions) == 0
 
     @staticmethod
     def parse_descr(line: str) -> RouteRepr:
@@ -108,7 +111,7 @@ class RouteRepr:
                          r"/(?P<path>[a-zA-Z0-9_/:.]*)\s->\s"
                          r"(?P<req_handler>[a-zA-Z0-9_]+)\s?"
                          r"(,\s(?P<resp_handler>[a-zA-Z0-9_]+)\s?)?"
-                         r"(\s\((?P<condition>.*)\))?$")
+                         r"(\s\((?P<conditions>([A-Z_]+)(\s[A-Z_]+)*)\))?$")
 
         if line != "":
             m = rec.match(line)
@@ -117,13 +120,18 @@ class RouteRepr:
                 path = m.group("path")
                 path = path.strip("/")
 
+                conditions = set()
+                if m.group("conditions"):
+                    for c in m.group("conditions").split(" "):
+                        if c != "":
+                            conditions.add(c)
+
                 return RouteRepr(
                     method=Method[m.group("method").upper()],
                     path=path,
                     req_handler=m.group("req_handler"),
                     resp_handler=m.group("resp_handler") or "",
-                    condition=m.group("condition").split(
-                    ) if m.group("condition") else []
+                    conditions=conditions
                 )
             else:
                 l.warning(f"Failed to parse route description: {line}")
@@ -132,8 +140,8 @@ class RouteRepr:
         ret = f"{self.method.name} {self.path} -> {self.req_handler}"
         if self.resp_handler:
             ret += f", {self.resp_handler}"
-        if self.condition:
-            ret += f" ({' '.join(self.condition)})"
+        if self.conditions:
+            ret += f" ({' '.join(self.conditions)})"
         return ret
 
 
@@ -144,6 +152,33 @@ class Tree:
         flags: Flag
 
         parent: Tree.Section
+        conditions: set[str]
+
+        def make_unconditional(self):
+            self.conditions = set()
+            
+        def unconditional(self) -> bool:
+            return len(self.conditions) == 0
+
+        def get_conds_ifdef_clause(self):
+            if self.parent is not None and self.parent.conditions == self.conditions:
+                return ""
+
+            if not self.unconditional():
+                return "#if " + " && ".join(
+                    [f"defined({cond})" for cond in self.conditions]
+                ) + "\n"
+            else:
+                return ""
+        
+        def get_conds_endif_clause(self):
+            if self.parent is not None and self.parent.conditions == self.conditions:
+                return ""
+            
+            if not self.unconditional():
+                return "\n#endif"
+            else:
+                return ""
 
         @abstractmethod
         def toc(self) -> str:
@@ -160,17 +195,26 @@ class Tree:
         resph: str
         reqh: str
 
+        def unconditional(self) -> bool:
+            return len(self.conditions) == 0
+
         def toc(self) -> str:
-            c = f"LEAF(\"{self.name}\", {self.flags}, "
+            c = ""
+            
+            c += self.get_conds_ifdef_clause()
+
+            c += f"\tLEAF(\"{self.name}\", {self.flags}, "
 
             resph = self.resph if self.resph else "NULL"
 
-            c += f"{self.reqh}, {resph})"
+            c += f"{self.reqh}, {resph}),"
+
+            c += self.get_conds_endif_clause()
 
             return c
 
         def __repr__(self) -> str:
-            return f"[L] {self.flags} {self.name} -> {self.reqh}, {self.resph}"
+            return f"[L] {self.flags} {self.name} -> {self.reqh}, {self.resph}" + " ! " + ", ".join(self.conditions)
 
     @dataclass
     class Section(Part):
@@ -179,8 +223,16 @@ class Tree:
         index: int = -1
         is_root: bool = False
 
+        def add_condition(self, cond: str):
+            if not self.unconditional():
+                self.conditions.add(cond)
+
+        def add_conditions(self, conds: set[str]):
+            if not self.unconditional():
+                self.conditions.update(conds)
+
         def __repr__(self) -> str:
-            return f"{self.flags} {self.name} :"
+            return f"{self.flags} {self.name} :" + " ! " + ", ".join(self.conditions)
 
         def add_part(self, part: Tree.Part) -> Tree.Part:
             self.children.append(part)
@@ -211,21 +263,33 @@ class Tree:
             return name
 
         def toc(self) -> str:
-            return f"SECTION(\"{self.name}\", {self.flags}, " \
+            c = ""
+
+            c += self.get_conds_ifdef_clause()
+                
+            c += f"\tSECTION(\"{self.name}\", {self.flags}, " \
                 f"{self._to_c_array_name()}, \n\t\t"\
-                f"ARRAY_SIZE({self._to_c_array_name()}))"
+                f"ARRAY_SIZE({self._to_c_array_name()})),"
+
+            c += self.get_conds_endif_clause()
+
+            return c
 
         def toc_array(self) -> str:
-            c = f"static const struct route_descr {self._to_c_array_name()}[] = {{\n\t"
+            c = ""
+            c += self.get_conds_ifdef_clause()
+            c += f"static const struct route_descr {self._to_c_array_name()}[] = {{\n"
 
-            c += f",\n\t".join([child.toc() for child in self.children])
+            c += f"\n".join([child.toc() for child in self.children])
+            c += "\n};"
+            c += self.get_conds_endif_clause()
 
-            c += "\n};\n"
+            c += "\n"
 
             return c
 
     def __init__(self) -> None:
-        self.root = Tree.Section("", Flag(0), None)
+        self.root = Tree.Section("", Flag(0), None, set())
         self.root.is_root = True
 
         self.handlers = list()
@@ -266,18 +330,20 @@ class Tree:
                             flags=route.method | Flag.LEAF | part_name_to_arg_flags(
                                 part_name),
                             parent=section,
+                            conditions=set(route.conditions),
                             resph=route.resp_handler,
-                            reqh=route.req_handler
+                            reqh=route.req_handler,
                         )
                     )
             else:
                 existing_section = section.find_section(part_name)
-                if not existing_section:
 
+                if not existing_section:
                     new_section = Tree.Section(
                         name=part_name,
                         flags=part_name_to_arg_flags(part_name),
-                        parent=section
+                        parent=section,
+                        conditions=set(route.conditions)
                     )
 
                     # If leafs with same part name exists, we need to move them
@@ -292,6 +358,10 @@ class Tree:
                     section.add_part(new_section)
                     section = new_section
                 else:
+                    if route.unconditional():
+                        existing_section.make_unconditional()
+                    else:
+                        existing_section.add_conditions(route.conditions)
                     section = existing_section
 
     def show(self):
@@ -320,9 +390,11 @@ class Tree:
         sections = []
         _generate_c(self.root, arrays, sections)
 
-        # c = "\n" + self.generate_c_sections(sections) + "\n\n"
+        c = "\n" 
+        
+        # c += self.generate_c_sections(sections) + "\n\n"
 
-        c = "\n".join(reversed(arrays)) + "\n"
+        c += "\n".join(reversed(arrays)) + "\n"
 
         return c
 
