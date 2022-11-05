@@ -1,6 +1,6 @@
 # Embed C utils
 
-Set of functions, structures for embedded C development.
+Set of structures and functions for embedded C development. Focusing POSIX compliant environments.
 
 ## Features
 
