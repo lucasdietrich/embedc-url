@@ -76,7 +76,7 @@ char *query_args_parse_find(char *url, const char *key)
 
 	int count = query_args_parse(url, qargs, ARRAY_SIZE(qargs));
 	if (count > 0) {
-		value = query_arg_get(qargs, MIN(count, ARRAY_SIZE(qargs)), key);
+		value = query_arg_get(qargs, MIN(count, (int)ARRAY_SIZE(qargs)), key);
 	}
 
 	return value;

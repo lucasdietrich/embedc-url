@@ -12,6 +12,7 @@ from pprint import pprint
 from enum import IntEnum, IntFlag
 from abc import ABC, abstractmethod
 import re
+import argparse
 
 import logging
 l = logging.getLogger("genroutes")
@@ -387,16 +388,66 @@ def build_routes_tree(routes: Iterable[RouteRepr]) -> Tree:
 
     return tree
 
-
 if __name__ == "__main__":
-    routes = parse_routes_repr_file("samples/parser/route.c")
+    # PARSE ARGUMENTS
+    p = argparse.ArgumentParser(description='List the content of a folder')
 
+    p.add_argument('input',
+                   metavar='input',
+                   type=str,
+                   help='input file where routes are described')
+    p.add_argument('--output',
+                   metavar='output',
+                   type=str,
+                   required=False,
+                   help='output file where routes definition will be generated')
+
+    p.add_argument('--descr-begin',
+                   metavar='descr_begin',
+                   type=str,
+                   required=False,
+                   default=ROUTES_DESCR_BEGIN_BOUNDARY,
+                   help='output file where routes definition will be generated')
+    p.add_argument('--descr-end',
+                   metavar='descr_end',
+                   type=str,
+                   required=False,
+                   default=ROUTES_DESCR_END_BOUNDARY,
+                   help='output file where routes definition will be generated')
+    p.add_argument('--def-begin',
+                   metavar='def_begin',
+                   type=str,
+                   required=False,
+                   default=ROUTES_DEF_BEGIN_BOUNDARY,
+                   help='output file where routes definition will be generated')
+    p.add_argument('--def-end',
+                   metavar='def_end',
+                   type=str,
+                   required=False,
+                   default=ROUTES_DEF_END_BOUNDARY,
+                   help='output file where routes definition will be generated')
+
+    p.add_argument('-v', '--verbose',
+                   action='store_true')
+    p.add_argument('-gh', '--handlers',
+                   action='store_true')
+
+    # Execute the parse_args() method
+    args = p.parse_args()
+
+    if args.output is None:
+        args.output = args.input
+
+    # PROCESS
+    routes = parse_routes_repr_file(args.input, args.descr_begin, args.descr_end)
     tree = build_routes_tree(routes)
-
-    # tree.show()
-
     c_str = tree.generate_c()
+    generate_routes_def_file(args.output, c_str)
 
-    # print(tree.generate_c_handlers(False))
+    if args.verbose:
+        pprint(tree.show())
 
-    generate_routes_def_file("samples/parser/route.c", c_str)
+    if args.handlers:
+        print(tree.generate_c_handlers(False))
+
+    # print(args)
