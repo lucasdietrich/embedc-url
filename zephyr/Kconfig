@@ -1,0 +1,17 @@
+menuconfig EMBEDC_UTILS
+        bool "embedc-utils - Utilities for embedded C development"
+        default n
+        help
+          Enable support for embedc-utils library
+
+if EMBEDC_UTILS
+
+module = EMBEDC_UTILS
+module-str = EMBEDC_UTILS
+
+config EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH
+		int "Maximum depth of routes iterator"
+		default 10
+		help
+		  Maximum depth of routes iterator
+endif
