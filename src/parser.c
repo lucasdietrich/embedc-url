@@ -20,29 +20,38 @@ int query_args_parse(char *url, struct query_arg qargs[], size_t alen)
 {
 	if (!url || (!qargs && alen))
 		return -EINVAL;
+	
+	size_t count = 0u;
 
 	/* Temporary query argument.
-	 * To keep track of current state */
+	 * To keep track of current state if qargs is not long enough */
 	struct query_arg zarg;
-
-	struct query_arg *arg = NULL;
-	size_t count = 0u;
+	struct query_arg *arg = &qargs[0u];
+	arg->key = url;
+	arg->value = NULL;
 
 	char *chr = url;
 
 	do {
 		switch (*chr) {
 		case '?':
-			if (count)
-				/* If argument already found, return error */
-				return -EINVAL;
+			/* Reset parsing */
+			if (count) {
+				arg = &qargs[0u];
+				arg->value = NULL;
+				count = 0u;
+			}
+
+			*chr = '\0';
+			arg->key = chr + 1u;
+			break;
 		case '&':
 			*chr = '\0';
 			/* If previous argument is not valid, ignore it */
 			if (!arg || *arg->key != '\0') {
+				count++;
 				arg = (count < alen) ? &qargs[count] : &zarg;
 				arg->value = NULL; /* In case no value is found */
-				count++;
 			}
 			arg->key = chr + 1u;
 			break;
@@ -59,9 +68,9 @@ int query_args_parse(char *url, struct query_arg qargs[], size_t alen)
 		chr++;
 	} while (*chr != '\0');
 
-	/* If last argument is empty, skip it */
-	if (arg && *arg->key == '\0') {
-		count--;
+	/* If last argument is not empty, add it */
+	if (arg && *arg->key != '\0') {
+		count++;
 	}
 
 	return (int)count;
@@ -111,9 +120,13 @@ int route_parse(char *url,
 
 	int ret = 0;
 	bool zcontinue = true;
-
 	struct route_part s;
-	s.str = url;
+
+	/* Remove leading '/' */
+	while (*p == '/')
+		p++;
+
+	s.str = p;
 	s.len = 0u;
 
 	while (zcontinue) {
@@ -139,6 +152,11 @@ int route_parse(char *url,
 	return ret ? ret : p - url;
 }
 
+static inline bool is_leaf(const struct route_descr *descr)
+{
+	return (descr->flags & ROUTE_IS_LEAF_MASK) == ROUTE_IS_LEAF;
+}
+
 int route_tree_iterate(const struct route_descr *root,
 		       size_t size,
 		       route_tree_iter_cb_t cb,
@@ -159,7 +177,7 @@ int route_tree_iterate(const struct route_descr *root,
 		if (cb(node, depth, user_data) == false)
 			goto exit;
 
-		if (node->flags & IS_LEAF) {
+		if (is_leaf(node)) {
 			routes_count++;
 
 			const size_t index = node - first;
@@ -269,18 +287,22 @@ static inline void mark_route_found(struct resolve_context *x)
 	x->child_count = 0u;
 }
 
+static inline bool node_matches_flags(const struct route_descr *descr,
+				      uint32_t flags,
+				      uint32_t mask)
+{
+	return (descr->flags & mask) == (flags & mask);
+}
+
 static int route_tree_resolve_cb(struct route_part *p,
 				 void *user_data)
 {
 	struct resolve_context *x = user_data;
 
-	if (p->len == 0u) {
-		/* ignore and continue */
-		return 0;
-	}
-
-	/* If we found the route but there is more, then we return an error */
-	if (route_found(x) == true) {
+	/* If we found the route but there is more, then we return an error
+	 * In order to ignore trailing '/', we just ignore empty parts
+	 */
+	if ((p->len != 0u) && (route_found(x) == true)) {
 		return -ENOENT;
 	}
 
@@ -291,13 +313,12 @@ static int route_tree_resolve_cb(struct route_part *p,
 	const struct route_descr *node;
 	for (node = x->descr; node < x->descr + x->child_count; node++) {
 		if (route_part_parse(node, p, &x->result->arg) == true) {
-
 			bool match = false;
 
-			if (node->flags & IS_LEAF) {
+			if (is_leaf(node)) {
 
 				/* Leaf flags should match */
-				if ((node->flags & x->mask) == x->flags) {
+				if (node_matches_flags(node, x->flags, x->mask)) {
 					x->descr = node;
 					mark_route_found(x);
 					match = true;
@@ -312,13 +333,37 @@ static int route_tree_resolve_cb(struct route_part *p,
 			if (match) {
 				x->result->descr = node;
 				x->result = x->results_remaining-- > 0u ? x->result + 1u : NULL;
+				return 0;
 			}
-
-			return 0;
 		}
 	}
 
 	return -ENOENT;
+}
+
+static const struct route_descr *
+find_section_leaf(const struct route_descr *section_first_child,
+		  size_t count,
+		  uint32_t flags,
+		  uint32_t mask)
+{
+	const struct route_descr *leaf = NULL;
+
+	/* Search for leaf */
+	flags |= ROUTE_IS_LEAF;
+	mask |= ROUTE_IS_LEAF;
+
+	for (const struct route_descr *node = section_first_child;
+	     node < section_first_child + count;
+	     node++) {
+		/* Find unamed leaf which matches flags */
+		if (!node->part.len && node_matches_flags(node, flags, mask)) {
+			leaf = node;
+			break;
+		}
+	}
+
+	return leaf;
 }
 
 const struct route_descr *route_tree_resolve(const struct route_descr *root,
@@ -346,9 +391,26 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 
 	ret = route_parse(url, route_tree_resolve_cb, &x);
 
-	if ((ret >= 0) && route_found(&x) && x.descr && (x.descr->flags & IS_LEAF)) {
-		leaf = x.descr;
+	if ((ret >= 0) && x.descr) {
+		if (is_leaf(x.descr) && route_found(&x)) {
+			leaf = x.descr;
+		} else {
+			/**
+			 * @brief If we end up on a section, we need to find the
+			 * unamed leaf which matches the flags.
+			 */
+			leaf = find_section_leaf(x.descr, x.child_count, flags, mask);
+			if (!x.result) {
+				leaf = NULL;
+			} else if (leaf) {
+				x.result->descr = leaf;
+				x.result->str = url + (uint32_t)ret - 1u;
+				x.results_remaining--;
+			}
+		}
+	}
 
+	if (leaf) {
 		*results_count -= x.results_remaining;
 	} else {
 		*results_count = 0u;

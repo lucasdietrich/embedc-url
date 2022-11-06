@@ -22,6 +22,9 @@ struct query_arg
 /**
  * @brief Parse a query string and store the key-value pairs in the args array
  * 
+ * Leading question mark "?" is optional, but arguments will only be
+ * parsed after the last question mark found in the string.
+ * 
  * @param url 
  * @param qargs 
  * @param alen 
