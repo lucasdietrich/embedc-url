@@ -174,7 +174,7 @@ int route_tree_iterate(const struct route_descr *root,
 	size_t children_count = size;
 
 	while (node) {
-		if (cb(node, depth, user_data) == false)
+		if (cb(node, parents, depth, user_data) == false)
 			goto exit;
 
 		if (is_leaf(node)) {
@@ -372,7 +372,8 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 					     uint32_t flags,
 					     uint32_t mask,
 					     struct route_parse_result *results,
-					     size_t *results_count)
+					     size_t *results_count,
+					     char **query_string)
 {
 	int ret;
 	const struct route_descr *leaf = NULL;
@@ -412,10 +413,48 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 
 	if (leaf) {
 		*results_count -= x.results_remaining;
+
+		/* ret necessarily positive at this point */
+		if (query_string) {
+			*query_string = url + (uint32_t)ret;
+		}
 	} else {
 		*results_count = 0u;
 	}
 
 exit:
 	return leaf;
+}
+
+const int route_build_url(char *url,
+			  size_t url_size,
+			  const struct route_descr **parents,
+			  size_t count)
+{
+	int ret = -EINVAL;
+
+	if (!url || !url_size)
+		goto exit;
+
+	if (count && !parents)
+		goto exit;
+
+	url[0u] = '/';
+	size_t len = 1u;
+
+	for (size_t i = 0u; i < count; i++) {
+		if (parents[i]->part.len > url_size - len - 1u) {
+			ret = -ENOMEM;
+			goto exit;
+		}
+
+		memcpy(&url[len], parents[i]->part.str, parents[i]->part.len);
+		len += parents[i]->part.len;
+		url[len++] = '/';
+	}
+	url[len] = '\0';
+	ret = (int)len;
+
+exit:
+	return ret;
 }

@@ -91,7 +91,7 @@ struct route_descr
 	uint32_t user_data;
 };
 
-#define LEAF(_p, _fl, _rq, _rp, _u) \
+#define LEAF(_p, _fl, _rp, _rq, _u) \
 	{ \
 		.flags = _fl | IS_LEAF, \
 		.part = { \
@@ -132,6 +132,7 @@ int route_parse(char *url,
  * @param[in] user_data User data
  */
 typedef bool (*route_tree_iter_cb_t)(const struct route_descr *descr,
+				     const struct route_descr *parents[],
 				     size_t depth,
 				     void *user_data);
 
@@ -176,6 +177,12 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 					     uint32_t flags,
 					     uint32_t mask,
 					     struct route_parse_result *results,
-					     size_t *results_count);
+					     size_t *results_count,
+					     char **query_string);
+
+const int route_build_url(char *url,
+			  size_t url_size,
+			  const struct route_descr **parents,
+			  size_t count);
 
 #endif /* _EMBEDC_PARSER_H_ */

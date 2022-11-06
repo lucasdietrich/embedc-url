@@ -158,8 +158,8 @@ class Tree:
         def unconditional(self) -> bool:
             return len(self.conditions) == 0
 
-        def get_conds_ifdef_clause(self):
-            if self.parent is not None and self.parent.conditions == self.conditions:
+        def get_conds_ifdef_clause(self, force: bool = False):
+            if not force and self.parent is not None and self.parent.conditions == self.conditions:
                 return ""
 
             if not self.unconditional():
@@ -169,8 +169,8 @@ class Tree:
             else:
                 return ""
         
-        def get_conds_endif_clause(self):
-            if self.parent is not None and self.parent.conditions == self.conditions:
+        def get_conds_endif_clause(self, force: bool = False):
+            if not force and self.parent is not None and self.parent.conditions == self.conditions:
                 return ""
             
             if not self.unconditional():
@@ -275,12 +275,12 @@ class Tree:
 
         def toc_array(self) -> str:
             c = ""
-            c += self.get_conds_ifdef_clause()
+            c += self.get_conds_ifdef_clause(True)
             c += f"static const struct route_descr {self._to_c_array_name()}[] = {{\n"
 
             c += f"\n".join([child.toc() for child in self.children])
             c += "\n};"
-            c += self.get_conds_endif_clause()
+            c += self.get_conds_endif_clause(True)
 
             c += "\n"
 
