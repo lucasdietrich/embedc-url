@@ -10,6 +10,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <embedc/parser_internal.h>
+
 #ifndef CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH
 #define CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH 10u
 #endif /* CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH */
@@ -198,9 +200,7 @@ static bool route_part_parse(const struct route_descr *node,
 			     const struct route_part *part,
 			     void *arg)
 {
-	if (node->flags & ARG_INT) {
-		return sscanf(part->str, "%d", (int *)arg) == 1;
-	} else if (node->flags & ARG_HEX) {
+	if (node->flags & ARG_HEX) {
 		return sscanf(part->str, "%x", (unsigned int *)arg) == 1;
 	} else if (node->flags & ARG_UINT) {
 		return sscanf(part->str, "%u", (unsigned int *)arg) == 1;

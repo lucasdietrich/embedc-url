@@ -55,36 +55,25 @@ struct route_part
 	size_t len;
 };
 
-#define GET		(1u << 0u)
-#define POST		(1u << 1u)
-#define PUT		(1u << 2u)
-#define DELETE		(1u << 3u)
+#define ROUTE_GET		(1u << 0u)
+#define ROUTE_POST		(1u << 1u)
+#define ROUTE_PUT		(1u << 2u)
+#define ROUTE_DELETE		(1u << 3u)
+#define ROUTE_METHODS_MASK	(ROUTE_GET | ROUTE_POST | ROUTE_PUT | ROUTE_DELETE)
 
-#define METHODS_MASK	(GET | POST | PUT | DELETE)
+#define ROUTE_ARG_UINT		(1u << 4u)
+#define ROUTE_ARG_HEX		(1u << 5u)
+#define ROUTE_ARG_STR		(1u << 6u)
+#define ROUTE_ARG_MASK		(ROUTE_ARG_UINT | ROUTE_ARG_HEX | ROUTE_ARG_STR)
 
-#define ARG_INT		(1u << 11u)
-#define ARG_HEX		(1u << 12u)
-#define ARG_STR		(1u << 13u)
-#define ARG_UINT	(1u << 14u)
-
-#define STREAM		(1u << 5u)
-
-#define CONTENT_TYPE_TEXT_PLAIN 		(1 << 6u)
-#define CONTENT_TYPE_TEXT_HTML 			(1 << 7u)
-#define CONTENT_TYPE_APPLICATION_JSON 		(1 << 8u)
-#define CONTENT_TYPE_MULTIPART_FORM_DATA 	(1 << 9u)
-#define CONTENT_TYPE_APPLICATION_OCTET_STREAM 	(1 << 10u)   
-
-#define IS_LEAF		(1u << 31u)
-
-#define IS_LEAF_MASK	(1u << 31u)
+#define ROUTE_IS_LEAF		(1u << 7u)
+#define ROUTE_IS_LEAF_MASK	(1u << 7u)
 
 struct route_descr
 {
 	uint32_t flags;
 
 	struct route_part part;
-
 	union {
 		struct {
 			const struct route_descr *list;
@@ -95,20 +84,23 @@ struct route_descr
 			void (*req_handler)(void);
 		};
 	};
+
+	uint32_t user_data;
 };
 
-#define LEAF(_p, _fl, _rq, _rp) \
+#define LEAF(_p, _fl, _rq, _rp, _u) \
 	{ \
 		.flags = _fl | IS_LEAF, \
 		.part = { \
 			.str = _p, \
 			.len = sizeof(_p) - 1u, \
 		}, \
-		.req_handler = _rq, \
-		.resp_handler = _rp, \
+		.req_handler = (void (*)(void))_rq, \
+		.resp_handler = (void (*)(void))_rp, \
+		.user_data = (uint32_t)_u, \
 	}
 
-#define SECTION(_p, _fl, _ls, _cc) \
+#define SECTION(_p, _fl, _ls, _cc, _u) \
 	{ \
 		.flags = _fl, \
 		.part = { \
@@ -119,6 +111,7 @@ struct route_descr
 			.list = _ls, \
 			.count = _cc, \
 		}, \
+		.user_data = (uint32_t)_u, \
 	}
 
 typedef int (*route_parser_cb_t)(struct route_part *s,

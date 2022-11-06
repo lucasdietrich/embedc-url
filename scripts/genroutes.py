@@ -33,28 +33,17 @@ class Method(IntFlag):
 
 # dynamically generate the variable
 METHOD_ALL = sum(m for m in Method)
-
-
 class Flag(IntFlag):
     GET = 1 << 0      # GET
     POST = 1 << 1     # POST
     PUT = 1 << 2      # PUT
     DELETE = 1 << 3   # DELETE
 
-    STREAM = 1 << 4   # stream
+    ARG_UINT = 1 << 4     # is unsigned int argument
+    ARG_STR = 1 << 5     # is str argument
+    ARG_HEX = 1 << 6     # is hex argument
 
-    CONTENT_TYPE_TEXT_PLAIN = 1 << 6
-    CONTENT_TYPE_TEXT_HTML = 1 << 7
-    CONTENT_TYPE_APPLICATION_JSON = 1 << 8
-    CONTENT_TYPE_MULTIPART_FORM_DATA = 1 << 9
-    CONTENT_TYPE_APPLICATION_OCTET_STREAM = 1 << 10
-
-    ARG_INT = 1 << 11     # is int argument
-    ARG_STR = 1 << 12     # is str argument
-    ARG_HEX = 1 << 13     # is hex argument
-    ARG_UINT = 1 << 14     # is unsigned int argument
-
-    LEAF = 1 << 31  # is leaf
+    LEAF = 1 << 7  # is leaf
 
     def __str__(self) -> str:
         hidden_flags = [Flag.LEAF]
@@ -71,7 +60,6 @@ class Flag(IntFlag):
 
 def part_name_to_arg_flags(part: str) -> Flag:
     arg_descr_table = {
-        "d": Flag.ARG_INT,
         "x": Flag.ARG_HEX,
         "s": Flag.ARG_STR,
         "u": Flag.ARG_UINT,
@@ -95,6 +83,7 @@ class RouteRepr:
     resp_handler: str
 
     conditions: set[str] = field(default_factory=set)
+    user_data: str = "0u"
 
     def unconditional(self) -> bool:
         return len(self.conditions) == 0
@@ -104,14 +93,17 @@ class RouteRepr:
         """
         Parse a route description line, as follows:
             GET /demo/json -> rest_demo_json
-            POST /dfu -> http_dfu_image_upload, http_dfu_image_upload_response (CONFIG_DFU)
-            GET /dfu -> http_dfu_status (CONFIG_DFU)
+            POST /dfu -> http_dfu_image_upload, http_dfu_image_upload_response (CONFIG_DFU) | 0x70u
+            GET /dfu -> http_dfu_status (CONFIG_DFU) | REST
         """
-        rec = re.compile(r"^(?P<method>[a-zA-Z]+)\s"
-                         r"/(?P<path>[a-zA-Z0-9_/:.]*)\s->\s"
-                         r"(?P<req_handler>[a-zA-Z0-9_]+)\s?"
-                         r"(,\s(?P<resp_handler>[a-zA-Z0-9_]+)\s?)?"
-                         r"(\s\((?P<conditions>([A-Z_]+)(\s[A-Z_]+)*)\))?$")
+        rec = re.compile(
+            r"^(?P<method>[a-zA-Z]+)\s"
+            r"/(?P<path>[a-zA-Z0-9_/:.]*)\s->\s"
+            r"(?P<req_handler>[a-zA-Z0-9_]+)\s?"
+            r"(,\s(?P<resp_handler>[a-zA-Z0-9_]+)\s?)?"
+            r"(\s\((?P<conditions>([A-Z_]+)(\s[A-Z_]+)*)\))?"
+            r"(\s*\|\s*(?P<user_data>([0-9]+u)|([A-Za-z0-9_]+)|(0x[0-9A-Fa-f]+u)?))?$"
+        )
 
         if line != "":
             m = rec.match(line)
@@ -126,12 +118,17 @@ class RouteRepr:
                         if c != "":
                             conditions.add(c)
 
+                user_data = m.group("user_data")
+                if not user_data:
+                    user_data = "0u"
+
                 return RouteRepr(
                     method=Method[m.group("method").upper()],
                     path=path,
                     req_handler=m.group("req_handler"),
                     resp_handler=m.group("resp_handler") or "",
-                    conditions=conditions
+                    conditions=conditions,
+                    user_data=user_data,
                 )
             else:
                 l.warning(f"Failed to parse route description: {line}")
@@ -150,6 +147,7 @@ class Tree:
     class Part(ABC):
         name: str
         flags: Flag
+        user_data: str
 
         parent: Tree.Section
         conditions: set[str]
@@ -207,7 +205,7 @@ class Tree:
 
             resph = self.resph if self.resph else "NULL"
 
-            c += f"{self.reqh}, {resph}),"
+            c += f"{self.reqh}, {resph}, {self.user_data}),"
 
             c += self.get_conds_endif_clause()
 
@@ -269,7 +267,7 @@ class Tree:
                 
             c += f"\tSECTION(\"{self.name}\", {self.flags}, " \
                 f"{self._to_c_array_name()}, \n\t\t"\
-                f"ARRAY_SIZE({self._to_c_array_name()})),"
+                f"ARRAY_SIZE({self._to_c_array_name()}), {self.user_data}),"
 
             c += self.get_conds_endif_clause()
 
@@ -289,7 +287,7 @@ class Tree:
             return c
 
     def __init__(self) -> None:
-        self.root = Tree.Section("", Flag(0), None, set())
+        self.root = Tree.Section("", Flag(0), "", None, set())
         self.root.is_root = True
 
         self.handlers = list()
@@ -329,6 +327,7 @@ class Tree:
                             name=part_name,
                             flags=route.method | Flag.LEAF | part_name_to_arg_flags(
                                 part_name),
+                            user_data=route.user_data,
                             parent=section,
                             conditions=set(route.conditions),
                             resph=route.resp_handler,
@@ -342,6 +341,7 @@ class Tree:
                     new_section = Tree.Section(
                         name=part_name,
                         flags=part_name_to_arg_flags(part_name),
+                        user_data=route.user_data,
                         parent=section,
                         conditions=set(route.conditions)
                     )
@@ -514,7 +514,7 @@ if __name__ == "__main__":
     routes = parse_routes_repr_file(args.input, args.descr_begin, args.descr_end)
     tree = build_routes_tree(routes)
     c_str = tree.generate_c()
-    generate_routes_def_file(args.output, c_str)
+    generate_routes_def_file(args.output, c_str, args.def_begin, args.def_end)
 
     if args.verbose:
         pprint(tree.show())
