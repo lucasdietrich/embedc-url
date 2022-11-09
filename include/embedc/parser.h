@@ -152,7 +152,10 @@ int route_tree_iterate(const struct route_descr *root,
 
 struct route_parse_result
 {
+	uint32_t depth;
+
 	const struct route_descr *descr;
+
 	union {
 		uint32_t uint;
 		int32_t sint;
@@ -184,5 +187,107 @@ const int route_build_url(char *url,
 			  size_t url_size,
 			  const struct route_descr **parents,
 			  size_t count);
+
+int route_results_find_arg(const struct route_parse_result *results,
+			  size_t count,
+			  const struct route_descr *search,
+			   uint32_t arg_flags,
+			   void **arg);
+
+int route_results_get_arg(const struct route_parse_result *results,
+			  size_t count,
+			  uint32_t index,
+			  uint32_t arg_flags,
+			  void **arg);
+
+static inline int
+route_results_find_uint(const struct route_parse_result *results,
+			size_t count,
+			const struct route_descr *search,
+			uint32_t *uint)
+{
+	return route_results_find_arg(
+		results, count, search, ROUTE_ARG_UINT, (void **)uint);
+}
+
+static inline int
+route_results_find_hex(const struct route_parse_result *results,
+		       size_t count,
+		       const struct route_descr *search,
+		       char *hex)
+{
+	return route_results_find_arg(
+		results, count, search, ROUTE_ARG_HEX, (void **)hex);
+}
+
+static inline int
+route_results_find_number(const struct route_parse_result *results,
+			  size_t count,
+			  const struct route_descr *search,
+			  uint32_t *n)
+{
+	return route_results_find_arg(
+		results,
+		count,
+		search,
+		ROUTE_ARG_UINT | ROUTE_ARG_HEX,
+		(void **)n
+	);
+}
+
+static inline int
+route_results_find_str(const struct route_parse_result *results,
+		       size_t count,
+		       const struct route_descr *search,
+		       char *str)
+{
+	return route_results_find_arg(
+		results, count, search, ROUTE_ARG_STR, (void **)str);
+}
+
+static inline int
+route_results_get_uint(const struct route_parse_result *results,
+		       size_t count,
+		       uint32_t index,
+		       uint32_t *uint)
+{
+	return route_results_get_arg(
+		results, count, index, ROUTE_ARG_UINT, (void **)uint);
+}
+
+static inline int
+route_results_get_hex(const struct route_parse_result *results,
+		      size_t count,
+		      uint32_t index,
+		      char *hex)
+{
+	return route_results_get_arg(
+		results, count, index, ROUTE_ARG_HEX, (void **)hex);
+}
+
+static inline int
+route_results_get_number(const struct route_parse_result *results,
+			 size_t count,
+			 uint32_t index,
+			 uint32_t *n)
+{
+	return route_results_get_arg(
+		results,
+		count,
+		index,
+		ROUTE_ARG_UINT | ROUTE_ARG_HEX,
+		(void **)n
+	);
+}
+
+static inline int
+route_results_get_str(const struct route_parse_result *results,
+		      size_t count,
+		      uint32_t index,
+		      char *str)
+{
+	return route_results_get_arg(
+		results, count, index, ROUTE_ARG_STR, (void **)str);
+}
 
 #endif /* _EMBEDC_PARSER_H_ */

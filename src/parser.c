@@ -275,6 +275,11 @@ struct resolve_context {
 	 * @brief Flags mask to match
 	 */
 	uint32_t mask;
+
+	/**
+	 * @brief Depth of the current route
+	 */
+	uint32_t depth;
 };
 
 static inline bool route_found(struct resolve_context *x)
@@ -330,7 +335,10 @@ static int route_tree_resolve_cb(struct route_part *p,
 				match = true;
 			}
 
+			
+
 			if (match) {
+				x->result->depth = ++x->depth;
 				x->result->descr = node;
 				x->result = x->results_remaining-- > 0u ? x->result + 1u : NULL;
 				return 0;
@@ -388,6 +396,7 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 		.results_remaining = *results_count,
 		.flags = flags,
 		.mask = mask,
+		.depth = 0u,
 	};
 
 	ret = route_parse(url, route_tree_resolve_cb, &x);
@@ -404,6 +413,7 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 			if (!x.result) {
 				leaf = NULL;
 			} else if (leaf) {
+				x.result->depth = x.depth + 1u;
 				x.result->descr = leaf;
 				x.result->str = url + (uint32_t)ret - 1u;
 				x.results_remaining--;
@@ -457,4 +467,55 @@ const int route_build_url(char *url,
 
 exit:
 	return ret;
+}
+
+static inline int result_get_arg(const struct route_parse_result *res,
+				 uint32_t arg_flags,
+				 void **arg)
+{
+	if (!res->descr)
+		return -EINVAL;
+
+	arg_flags &= ROUTE_ARG_MASK;
+
+	/* We can match several flags at once (e.g. HEX and UINT) */
+	if (!arg_flags || ((res->descr->flags & arg_flags) == 0u))
+		return -EINVAL;
+
+	*arg = (void *)res->arg;
+
+	return 0;
+}
+
+int route_results_find_arg(const struct route_parse_result *results,
+			   size_t count,
+			   const struct route_descr *search,
+			   uint32_t arg_flags,
+			   void **arg)
+{
+	if (!results || !count || !arg)
+		return -EINVAL;
+
+	for (size_t i = 0u; i < count; i++) {
+		if (results[i].descr == search) {
+			return result_get_arg(&results[i], arg_flags, arg);
+		}
+	}
+
+	return -ENOENT;
+}
+
+int route_results_get_arg(const struct route_parse_result *results,
+			  size_t count,
+			  uint32_t index,
+			  uint32_t arg_flags,
+			  void **arg)
+{
+	if (!results || !count || !arg || !arg_flags)
+		return -EINVAL;
+
+	if (index >= count)
+		return -ENOENT;
+	
+	return result_get_arg(&results[index], arg_flags, arg);
 }
