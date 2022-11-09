@@ -412,8 +412,9 @@ class Tree:
 
 def parse_routes_repr_file(file: str,
                            rbegin: str = ROUTES_DESCR_BEGIN_BOUNDARY,
-                           rend: str = ROUTES_DESCR_END_BOUNDARY) -> Iterable[RouteRepr]:
-    state = 0
+                           rend: str = ROUTES_DESCR_END_BOUNDARY,
+                           whole: bool = False) -> Iterable[RouteRepr]:
+    state = 1 if whole else 0
     with open(file, "r") as f:
         for line in f.readlines():
             line = line.strip()
@@ -422,7 +423,7 @@ def parse_routes_repr_file(file: str,
                 if line == rbegin:
                     state = 1
             elif state == 1:
-                if line == rend:
+                if not whole and line == rend:
                     break
                 else:
                     route = RouteRepr.parse_descr(line)
@@ -498,6 +499,9 @@ if __name__ == "__main__":
                    required=False,
                    default=ROUTES_DEF_END_BOUNDARY,
                    help='output file where routes definition will be generated')
+    p.add_argument('-dw', '--descr-whole', 
+                   action='store_true',
+                   help='Ignore boundaries and parse whole file')
 
     p.add_argument('-v', '--verbose',
                    action='store_true')
@@ -511,7 +515,12 @@ if __name__ == "__main__":
         args.output = args.input
 
     # PROCESS
-    routes = parse_routes_repr_file(args.input, args.descr_begin, args.descr_end)
+    routes = parse_routes_repr_file(
+        args.input,
+        args.descr_begin,
+        args.descr_end,
+        True if args.descr_whole else False
+    )
     tree = build_routes_tree(routes)
     c_str = tree.generate_c()
     generate_routes_def_file(args.output, c_str, args.def_begin, args.def_end)
