@@ -194,7 +194,7 @@ int route_results_find_arg(const struct route_parse_result *results,
 			   uint32_t arg_flags,
 			   void **arg);
 
-int route_results_get_arg(const struct route_parse_result *results,
+int route_results_get_arg_by_index(const struct route_parse_result *results,
 			  size_t count,
 			  uint32_t index,
 			  uint32_t arg_flags,
@@ -246,32 +246,32 @@ route_results_find_str(const struct route_parse_result *results,
 }
 
 static inline int
-route_results_get_uint(const struct route_parse_result *results,
+route_results_get_uint_by_index(const struct route_parse_result *results,
 		       size_t count,
 		       uint32_t index,
 		       uint32_t *uint)
 {
-	return route_results_get_arg(
+	return route_results_get_arg_by_index(
 		results, count, index, ROUTE_ARG_UINT, (void **)uint);
 }
 
 static inline int
-route_results_get_hex(const struct route_parse_result *results,
+route_results_get_hex_by_index(const struct route_parse_result *results,
 		      size_t count,
 		      uint32_t index,
 		      char *hex)
 {
-	return route_results_get_arg(
+	return route_results_get_arg_by_index(
 		results, count, index, ROUTE_ARG_HEX, (void **)hex);
 }
 
 static inline int
-route_results_get_number(const struct route_parse_result *results,
+route_results_get_number_by_index(const struct route_parse_result *results,
 			 size_t count,
 			 uint32_t index,
 			 uint32_t *n)
 {
-	return route_results_get_arg(
+	return route_results_get_arg_by_index(
 		results,
 		count,
 		index,
@@ -281,13 +281,20 @@ route_results_get_number(const struct route_parse_result *results,
 }
 
 static inline int
-route_results_get_str(const struct route_parse_result *results,
+route_results_get_str_by_index(const struct route_parse_result *results,
 		      size_t count,
 		      uint32_t index,
 		      char *str)
 {
-	return route_results_get_arg(
+	return route_results_get_arg_by_index(
 		results, count, index, ROUTE_ARG_STR, (void **)str);
 }
+
+int
+route_results_get(const struct route_parse_result *results,
+		  size_t count,
+		  const char *name,
+		  uint32_t arg_flags,
+		  void **arg);
 
 #endif /* _EMBEDC_PARSER_H_ */

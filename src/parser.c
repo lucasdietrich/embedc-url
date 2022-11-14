@@ -20,7 +20,7 @@ int query_args_parse(char *url, struct query_arg qargs[], size_t alen)
 {
 	if (!url || (!qargs && alen))
 		return -EINVAL;
-	
+
 	size_t count = 0u;
 
 	/* Temporary query argument.
@@ -246,7 +246,7 @@ struct resolve_context {
 
 	/**
 	 * @brief Children count of the last section being matched
-	 * 
+	 *
 	 * If route has been found, this value is 0. It can be used to know
 	 * whether we expect more parts in the route or not.
 	 */
@@ -254,14 +254,14 @@ struct resolve_context {
 
 	/**
 	 * @brief Current memory block to store matched route part.
-	 * 
+	 *
 	 * Note: Should be initialized to the beginning of an array
 	 */
 	struct route_parse_result *result;
 
 	/**
 	 * @brief Remaining number of elements
-	 * 
+	 *
 	 * Note: Should be initialized  to the size of the array
 	 */
 	size_t results_remaining;
@@ -335,7 +335,7 @@ static int route_tree_resolve_cb(struct route_part *p,
 				match = true;
 			}
 
-			
+
 
 			if (match) {
 				x->result->depth = ++x->depth;
@@ -505,17 +505,48 @@ int route_results_find_arg(const struct route_parse_result *results,
 	return -ENOENT;
 }
 
-int route_results_get_arg(const struct route_parse_result *results,
-			  size_t count,
-			  uint32_t index,
-			  uint32_t arg_flags,
-			  void **arg)
+int route_results_get_arg_by_index(const struct route_parse_result *results,
+				   size_t count,
+				   uint32_t index,
+				   uint32_t arg_flags,
+				   void **arg)
 {
 	if (!results || !count || !arg || !arg_flags)
 		return -EINVAL;
 
 	if (index >= count)
 		return -ENOENT;
-	
+
 	return result_get_arg(&results[index], arg_flags, arg);
+}
+
+int
+route_results_get(const struct route_parse_result *results,
+		  size_t count,
+		  const char *name,
+		  uint32_t arg_flags,
+		  void **arg)
+{
+	if (!results || !count || !name || !arg_flags)
+		return -EINVAL;
+
+	arg_flags &= ROUTE_ARG_MASK;
+
+	for (size_t i = 0u; i < count; i++) {
+		if ((results[i].descr->flags & arg_flags) == 0u) {
+			continue;
+		}
+
+		size_t name_len = strlen(name);
+		if (name_len != results[i].descr->part.len - 2u) { /* Ignore trailling :u in comparison */
+			continue;
+		}
+
+		if (strncmp(name, results[i].descr->part.str, name_len) == 0) {
+			*arg = (void *)results[i].arg;
+			return 0;
+		}
+	}
+
+	return -ENOENT;
 }

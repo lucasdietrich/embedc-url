@@ -64,14 +64,15 @@ def part_name_to_arg_flags(part: str) -> Flag:
         "s": Flag.ARG_STR,
         "u": Flag.ARG_UINT,
     }
-    if is_arg_descr(part):
-        return arg_descr_table.get(part[1:], Flag(0))
+    m = parse_arg_descr(part)
+    if m:
+        return arg_descr_table.get(m.groupdict().get("argpart"), Flag(0))
     else:
         return Flag(0)
 
 
-def is_arg_descr(part: str) -> bool:
-    return re.match(r"\:[a-zA-Z0-9_]+", part) is not None
+def parse_arg_descr(part: str) -> re.Match:
+    return re.match(r"(?P<argname>[a-zA-Z0-9_]*)\:(?P<argpart>[xsu]{1})", part)
 
 
 @dataclass
@@ -102,7 +103,7 @@ class RouteRepr:
             r"(?P<req_handler>[a-zA-Z0-9_]+)\s?"
             r"(,\s(?P<resp_handler>[a-zA-Z0-9_]+)\s?)?"
             r"(\s\((?P<conditions>([A-Z_]+)(\s[A-Z_]+)*)\))?"
-            r"(\s*\|\s*(?P<user_data>([0-9]+u)|([A-Za-z0-9_]+)|(0x[0-9A-Fa-f]+u)?))?$"
+            r"(\s*\|\s*(?P<user_data>([0-9]+u)|([A-Za-z0-9_+]+)|(0x[0-9A-Fa-f]+u)?))?$"
         )
 
         if line != "":
