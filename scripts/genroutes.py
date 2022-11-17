@@ -57,6 +57,8 @@ class Flag(IntFlag):
 
         return string
 
+ARGS_MASK = Flag.ARG_HEX | Flag.ARG_STR | Flag.ARG_UINT
+
 
 def part_name_to_arg_flags(part: str) -> Flag:
     arg_descr_table = {
@@ -72,7 +74,7 @@ def part_name_to_arg_flags(part: str) -> Flag:
 
 
 def parse_arg_descr(part: str) -> re.Match:
-    return re.match(r"(?P<argname>[a-zA-Z0-9_]*)\:(?P<argpart>[xsu]{1})", part)
+    return re.match(r"^(?P<argname>[a-zA-Z0-9_]*)\:(?P<argpart>[xsu]{1})$", part)
 
 
 @dataclass
@@ -323,11 +325,11 @@ class Tree:
                         part_name = ""
                         section = group_section
 
+                    flags = route.method | Flag.LEAF | part_name_to_arg_flags(part_name)                    
                     section.add_part(
                         Tree.Leaf(
                             name=part_name,
-                            flags=route.method | Flag.LEAF | part_name_to_arg_flags(
-                                part_name),
+                            flags=flags,
                             user_data=route.user_data,
                             parent=section,
                             conditions=set(route.conditions),
@@ -353,6 +355,7 @@ class Tree:
                         section.find_leafs(part_name, METHOD_ALL))
                     for leaf in leafs_with_same_name:
                         leaf.name = ""
+                        leaf.flags &= ~ARGS_MASK # arg parsing is done in above section 
                         leaf.parent.children.remove(leaf)
                         new_section.add_part(leaf)
 

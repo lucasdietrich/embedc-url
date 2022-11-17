@@ -527,7 +527,7 @@ route_results_get(const struct route_parse_result *results,
 		  uint32_t arg_flags,
 		  void **arg)
 {
-	if (!results || !count || !name || !arg_flags)
+	if (!results || !count || !name || !arg || !arg_flags)
 		return -EINVAL;
 
 	arg_flags &= ROUTE_ARG_MASK;
