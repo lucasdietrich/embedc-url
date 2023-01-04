@@ -436,10 +436,10 @@ exit:
 	return leaf;
 }
 
-const int route_build_url(char *url,
-			  size_t url_size,
-			  const struct route_descr **parents,
-			  size_t count)
+int route_build_url(char *url,
+		    size_t url_size,
+		    const struct route_descr **parents,
+		    size_t count)
 {
 	int ret = -EINVAL;
 

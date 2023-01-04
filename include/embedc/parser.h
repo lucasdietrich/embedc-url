@@ -183,10 +183,10 @@ const struct route_descr *route_tree_resolve(const struct route_descr *root,
 					     size_t *results_count,
 					     char **query_string);
 
-const int route_build_url(char *url,
-			  size_t url_size,
-			  const struct route_descr **parents,
-			  size_t count);
+int route_build_url(char *url,
+		    size_t url_size,
+		    const struct route_descr **parents,
+		    size_t count);
 
 int route_results_find_arg(const struct route_parse_result *results,
 			  size_t count,
