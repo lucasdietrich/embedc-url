@@ -1,6 +1,6 @@
-# Embed C utils
+# Embed C URL utils
 
-Set of structures and functions for embedded C development. Focusing POSIX compliant environments.
+Set of structures and functions for handling of HTTP URLs.
 
 ## Features
 
@@ -9,6 +9,3 @@ Set of structures and functions for embedded C development. Focusing POSIX compl
     - Routes tree
     - Route matching
     - Query string parser
-- Structures
-  - Buffers
-    - 

@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _EMBEDC_PARSER_H_
-#define _EMBEDC_PARSER_H_
+#ifndef _EMBEDC_URL_PARSER_H_
+#define _EMBEDC_URL_PARSER_H_
 
-#include <embedc/common.h>
-
-/*____________________________________________________________________________*/
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 /* HTTP query string parser */
 
@@ -48,7 +48,6 @@ static inline bool query_arg_is_set(const char *key, struct query_arg qargs[], s
  */
 char *query_args_parse_find(char *url, const char *key);
 
-/*____________________________________________________________________________*/
 
 /* HTTP routes tree structure, functions and parser */
 
@@ -297,4 +296,4 @@ route_results_get(const struct route_parse_result *results,
 		  uint32_t arg_flags,
 		  void **arg);
 
-#endif /* _EMBEDC_PARSER_H_ */
+#endif /* _EMBEDC_URL_PARSER_H_ */

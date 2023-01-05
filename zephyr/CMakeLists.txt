@@ -1,4 +1,4 @@
-if(CONFIG_EMBEDC_UTILS)
+if(CONFIG_EMBEDC_URL_PARSER)
     zephyr_library()
 
     set(lib ${ZEPHYR_CURRENT_MODULE_DIR})

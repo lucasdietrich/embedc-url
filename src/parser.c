@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <embedc/parser.h>
 
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
 
-#include <embedc/parser_internal.h>
+#include <embedc-url/parser.h>
+#include <embedc-url/parser_internal.h>
 
-#ifndef CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH
-#define CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH 10u
-#endif /* CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH */
+#ifndef CONFIG_EMBEDC_URL_PARSER_ITER_MAX_DEPTH
+#define CONFIG_EMBEDC_URL_PARSER_ITER_MAX_DEPTH 10u
+#endif /* CONFIG_EMBEDC_URL_PARSER_ITER_MAX_DEPTH */
 
 int query_args_parse(char *url, struct query_arg qargs[], size_t alen)
 {
@@ -165,7 +165,7 @@ int route_tree_iterate(const struct route_descr *root,
 	if (!root || !size || !cb)
 		return -EINVAL;
 
-	const struct route_descr *parents[CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH];
+	const struct route_descr *parents[CONFIG_EMBEDC_URL_PARSER_ITER_MAX_DEPTH];
 	size_t depth = 0u;
 	size_t routes_count = 0u;
 
@@ -200,7 +200,7 @@ int route_tree_iterate(const struct route_descr *root,
 				}
 			} while (node - first >= (int)children_count);
 		} else {
-			if (depth >= CONFIG_EMBEDC_UTILS_ROUTES_ITER_MAX_DEPTH)
+			if (depth >= CONFIG_EMBEDC_URL_PARSER_ITER_MAX_DEPTH)
 				return -EOVERFLOW;
 
 			parents[depth++] = node;
