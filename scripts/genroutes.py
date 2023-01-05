@@ -448,7 +448,7 @@ def generate_routes_def_file(file: str,
     end = content.find(rend)
 
     if begin == -1 or end == -1:
-        raise RuntimeError("Invalid file format")
+        raise RuntimeError("Invalid file format, boundaries not found")
 
     # replace code between boundaries with content of c_str
     content = content[:begin + len(rbegin)] + c_str + content[end:]
