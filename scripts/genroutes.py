@@ -104,7 +104,7 @@ class RouteRepr:
             r"/(?P<path>[a-zA-Z0-9_/:.]*)\s->\s"
             r"(?P<req_handler>[a-zA-Z0-9_]+)\s?"
             r"(,\s(?P<resp_handler>[a-zA-Z0-9_]+)\s?)?"
-            r"(\s\((?P<conditions>([A-Z_]+)(\s[A-Z_]+)*)\))?"
+            r"(\s\((?P<conditions>([A-Z_]+)((\s|,|,\s)[A-Z_]+)*)\))?"
             r"(\s*\|\s*(?P<user_data>([0-9]+u)|([A-Za-z0-9_+]+)|(0x[0-9A-Fa-f]+u)?))?$"
         )
 
@@ -117,7 +117,7 @@ class RouteRepr:
 
                 conditions = set()
                 if m.group("conditions"):
-                    for c in m.group("conditions").split(" "):
+                    for c in re.split(r"\s|,|,\s", m.group("conditions")):
                         if c != "":
                             conditions.add(c)
 
