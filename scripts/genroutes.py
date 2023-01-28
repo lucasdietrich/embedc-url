@@ -161,12 +161,17 @@ class Tree:
         def unconditional(self) -> bool:
             return len(self.conditions) == 0
 
-        def get_conds_ifdef_clause(self, force: bool = False):
+        def get_conds_ifdef_clause(self, force: bool = False, operator: str = "&&"):
             if not force and self.parent is not None and self.parent.conditions == self.conditions:
                 return ""
 
+            if operator not in ["&&", "||"]:
+                raise ValueError("Invalid operator")
+            
+            operator = " " + operator + " "
+
             if not self.unconditional():
-                return "#if " + " && ".join(
+                return "#if " + operator.join(
                     [f"defined({cond})" for cond in self.conditions]
                 ) + "\n"
             else:
@@ -202,7 +207,7 @@ class Tree:
         def toc(self) -> str:
             c = ""
             
-            c += self.get_conds_ifdef_clause()
+            c += self.get_conds_ifdef_clause(operator="&&")
 
             c += f"\tLEAF(\"{self.name}\", {self.flags}, "
 
@@ -266,7 +271,7 @@ class Tree:
         def toc(self) -> str:
             c = ""
 
-            c += self.get_conds_ifdef_clause()
+            c += self.get_conds_ifdef_clause(operator="&&")
                 
             c += f"\tSECTION(\"{self.name}\", {self.flags}, " \
                 f"{self._to_c_array_name()}, \n\t\t"\
@@ -278,7 +283,7 @@ class Tree:
 
         def toc_array(self) -> str:
             c = ""
-            c += self.get_conds_ifdef_clause(True)
+            c += self.get_conds_ifdef_clause(True, operator="||")
             c += f"static const struct route_descr {self._to_c_array_name()}[] = {{\n"
 
             c += f"\n".join([child.toc() for child in self.children])
